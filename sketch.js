@@ -108,12 +108,6 @@ function setup() {
 
   sounds.theme.loop();
   sounds.theme.play();
-  for (let i = 0; i < NUM_PARTICLES; i++) {
-    let p = createVector(0, 0);
-    pPositions.push(p);
-    cPositions.push(p);
-    xs.push(0);
-  }
   loadTextures();
   poseNet = ml5.poseNet(video, modelLoaded);
   poseNet.on("pose", function (results) {
@@ -293,11 +287,11 @@ function loadTextures() {
   }
 }
 
-function keyPressed() {
-  if (key == " ") {
-    hero.jump();
-  }
-}
+// function keyPressed() {
+//   if (key == " ") {
+//     hero.jump();
+//   }
+// }
 
 function mouseClicked() {
   if (gameOver) {
