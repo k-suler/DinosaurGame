@@ -39,7 +39,7 @@ class Chicken {
         score += 1;
       }
     }
-    speed += 0.01;
+    speed += 0.05;
     this.blockJump = true;
   }
 

@@ -108,9 +108,6 @@ function setup() {
 
   sounds.theme.loop();
   sounds.theme.play();
-  // heroAnim.setCollider("circle", 47);
-  // birdAnim.setCollider("circle", 65);
-  // rock.setCollider("circle", 0, 0, 80);
   for (let i = 0; i < NUM_PARTICLES; i++) {
     let p = createVector(0, 0);
     pPositions.push(p);
@@ -132,8 +129,8 @@ function setup() {
   stroke(255);
 
   physics = new VerletPhysics2D();
-  physics.setDrag(0.05);
-  physics.setWorldBounds(new Rect(50, 0, width - 100, height - height / 3));
+  // physics.setDrag(0.05);
+  // physics.setWorldBounds(new Rect(50, 0, width - 100, height - height / 3));
   // physics.addBehavior(new GravityBehavior(new Vec2D(0, 0.15)));
 
   headPos = new Vec2D(width / 2, height / 2);
@@ -156,15 +153,6 @@ function setup() {
   // rightHAttractor = new AttractionBehavior(rightHPos, 100, -2.9);
   // physics.addBehavior(rightHAttractor);
 }
-
-// function addParticle() {
-//   let randLoc = Vec2D.randomVector()
-//     .scale(5)
-//     .addSelf(width / 2, 0);
-//   let p = new VerletParticle2D(randLoc);
-//   physics.addParticle(p);
-//   physics.addBehavior(new AttractionBehavior(p, 100, -0.8, 0.1));
-// }
 
 function draw() {
   physics.update();
@@ -191,30 +179,7 @@ function draw() {
   if (checkJump()) {
     hero.jump();
   }
-  // if (physics.particles.length < NUM_PARTICLES) {
-  //   addParticle();
-  // }
 
-  for (let i = 0; i < physics.particles.length; i++) {
-    let p = physics.particles[i];
-    cPositions[i] = createVector(p.x, p.y);
-    //fill(0);
-    //noStroke();
-    //ellipse(p.x, p.y, 10, 10);
-
-    var angleDeg = Math.atan2(pPositions[i].y - p.y, pPositions[i].x - p.x);
-    let targetX = angleDeg;
-    let dx = targetX - xs[i];
-    xs[i] += dx * easing;
-
-    tint(255);
-    push();
-    translate(p.x, p.y);
-    rotate(xs[i]);
-    image(textures[i], -50, -50, 100, 100);
-    pop();
-    pPositions[i] = cPositions[i];
-  }
   if (gameOver) {
     let c = color(255, 204, 0);
     fill(c);
