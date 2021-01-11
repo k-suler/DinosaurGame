@@ -4,6 +4,8 @@ A scene where multiple participants are involved in the interaction
 todo: add multiple head positions
 
 */
+// const axios = require("axios");
+const baseUrl = "https://ksuler.pythonanywhere.com/api/v1/";
 
 let w = 1240;
 let h = 720;
@@ -40,11 +42,18 @@ let easing = 0.1;
 
 let gameOver = false;
 let score = 0;
+let player = "";
 
+let api;
+
+let input, button, label;
 let under = false;
 
+let scoreboard = false;
+let submited = false;
+
 // physics for playful interaction
-let  Vec2D = toxi.geom.Vec2D;
+let Vec2D = toxi.geom.Vec2D;
 
 let mouseAttractor;
 let mousePos;
@@ -76,6 +85,7 @@ function preload() {
 
   birdSheet = loadSpriteSheet("data/obstacles/bird.png", 125, 100, 2);
   birdAnim = loadAnimation(birdSheet);
+  birdAnim.frameDelay = 15;
 
   rockImg = loadImage("data/obstacles/rock.png");
   rockImg.resize(60, 60);
@@ -94,36 +104,33 @@ function preload() {
   sounds.theme.setVolume(0.2);
 }
 
-// model learning 
+// model learning
 let collectState = false;
 let trainState = false;
-state = 'waiting';
+state = "waiting";
 let targetLabel;
 
-
 async function getPoseClass() {
-    if (poses && poses.length > 0) {
-      pose = poses[0].pose;
-      
-      let inputs = [];
-      for (let index = 0; index < pose.keypoints.length; index++) {
-        inputs.push(pose.keypoints[index].position.x);
-        inputs.push(pose.keypoints[index].position.y);
-      }
+  if (poses && poses.length > 0) {
+    pose = poses[0].pose;
 
-      await nn.classify(inputs, controlHero)
+    let inputs = [];
+    for (let index = 0; index < pose.keypoints.length; index++) {
+      inputs.push(pose.keypoints[index].position.x);
+      inputs.push(pose.keypoints[index].position.y);
     }
+
+    await nn.classify(inputs, controlHero);
+  }
 }
-
-
 
 function getPoses(res) {
   // When in collecting the training data state
   if (collectState) {
     if (res.length > 0) {
       pose = res[0].pose;
-      
-      if (state == 'collecting') {
+
+      if (state == "collecting") {
         let inputs = [];
         for (let index = 0; index < pose.keypoints.length; index++) {
           inputs.push(pose.keypoints[index].position.x);
@@ -134,15 +141,13 @@ function getPoses(res) {
       }
     }
   }
-
-  poses = res
+  poses = res;
 }
-
 
 function trainModel() {
   print("training model");
   nn.normalizeData();
-  nn.train({epochs: 10}, saveModel);
+  nn.train({ epochs: 10 }, saveModel);
 }
 
 function saveModel() {
@@ -150,14 +155,28 @@ function saveModel() {
   nn.save();
 }
 
-
-
 function setup() {
   createCanvas(w, h);
+
+  input = createInput();
+  input.position(w / 2 - 125, h / 2);
+  input.hide();
+
+  button = createButton("submit");
+  button.addClass("button");
+  button.position(w / 2 - 250, input.y + input.height + 20);
+  button.hide();
+
+  label = createElement("h1", "Input your name:");
+  label.position(input.x, h / 2 - 65);
+  label.hide();
+
   video = createCapture(VIDEO);
   video.hide();
   // video.size(w, h);
 
+  api = new Api(axios);
+  api.get();
   sounds.theme.loop();
   sounds.theme.play();
   loadTextures();
@@ -165,25 +184,24 @@ function setup() {
   poseNet = ml5.poseNet(video, modelLoaded);
   poseNet.on("pose", getPoses);
 
-
   let options = {
     inputs: 34,
     outputs: 2,
-    task: 'classification',
-    debug: true
-  }
-  nn = ml5.neuralNetwork(options)
+    task: "classification",
+    debug: true,
+  };
+  nn = ml5.neuralNetwork(options);
 
   if (trainState) {
-    nn.loadData('squat.json', trainModel);
+    nn.loadData("squat2.json", trainModel);
   }
   if (!trainState && !collectState) {
     const modelInfo = {
-      model: 'model.json',
-      metadata: 'model_meta.json',
-      weights: 'model.weights.bin',
-    }
-    nn.load(modelInfo, nnLoaded)
+      model: "model.json",
+      metadata: "model_meta.json",
+      weights: "model.weights.bin",
+    };
+    nn.load(modelInfo, nnLoaded);
   }
 
   hero = new Chicken();
@@ -194,28 +212,24 @@ function setup() {
   stroke(255);
 
   headPos = new Vec2D(width / 2, height / 2);
-  
 }
 
-let skipingFrames = 5;
+let skipingFrames = 10;
 let skippedFrame = 0;
 
 function draw() {
-
   if (trainState || collectState) {
-
     image(video, 0, 0, w, h);
     drawSkeleton();
     return;
   }
   // background(255);
   image(backgrounds[0], 0, 0, w, h);
-  hero.show();
   rock.show();
   bird.show();
-  tint(255, 150);
+  hero.show();
+  tint(255, 30);
   // heroAnim.collide(rock);
-
   // translate(w, 0); // move to far corner
   // scale(-1.0, 1.0);
   // image(video, 0, 0, w, h);
@@ -232,33 +246,64 @@ function draw() {
   if (skipingFrames == skippedFrame) {
     skippedFrame = 0;
     getPoseClass();
-  } else if (skippedFrame = 10) {
-    drawSkeleton();
-    drawKeypoints();
   }
+  drawSkeleton();
+  drawKeypoints();
 
   // if (checkJump()) {
-    // hero.jump();
+  // hero.jump();
   // }
-
+  let fps = frameRate();
+  fill(255);
+  stroke(0);
+  text("FPS: " + fps.toFixed(2), 10, height - 10);
   if (gameOver) {
-    let c = color(255, 204, 0);
-    fill(c);
-    // noStroke();
-    strokeWeight(4);
-    stroke(50);
-    rect(w / 6, h / 6, 800, 400, 20);
-    // scale(-1.0, 1.0);
-    fill(0);
-    textSize(60);
+    if (scoreboard) {
+      console.log("show scoreboard");
+      input.hide();
+      button.hide();
+      label.hide();
 
-    noStroke();
-    text("Game over", w / 3 + 40, h / 2 - 50);
-    textSize(40);
-    text("Score: " + score, w / 3 + 40, h / 2 + 50);
+      let c = color(255, 204, 0);
+      fill(c);
+      // noStroke();
+      strokeWeight(4);
+      stroke(50);
+      rect(w / 6, h / 6, 800, 450, 20);
+      // scale(-1.0, 1.0);
+      fill(0);
+      strokeWeight(0);
+      stroke(0);
+      textSize(40);
+      for (let index = 0; index < api.scores.length; index++) {
+        const score = api.scores[index];
+        text(
+          `${index + 1}:  ${score.score} -   ${score.player}`,
+          w / 3 + 10,
+          180 + 40 * index
+        );
+      }
 
-    textSize(20);
-    text("Click anywhere to restart", w / 3 + 40, h / 2 + 150);
+      noStroke();
+    } else {
+      let c = color(255, 204, 0);
+      fill(c);
+      // noStroke();
+      strokeWeight(4);
+      stroke(50);
+      rect(w / 6, h / 6, 800, 450, 20);
+      // scale(-1.0, 1.0);
+      fill(0);
+      textSize(60);
+
+      noStroke();
+      text("Game over", w / 3 + 40, h / 2 - 160);
+      textSize(40);
+      text("Score: " + score, w / 3 + 40, h / 2 - 100);
+
+      textSize(20);
+      text("Click anywhere to restart", w / 3 + 70, h / 2 + 200);
+    }
   }
 
   textSize(40);
@@ -334,13 +379,13 @@ function drawKeypoints() {
 }
 
 function controlHero(error, res) {
-  console.log(res[0].label)
+  console.log(res[0].label);
   const playerPose = res[0].label;
-  if (playerPose == 'n' && under) {
+  if (playerPose == "n" && under) {
     under = false;
     hero.jump();
     return true;
-  } else if (playerPose == 's' && !under) {
+  } else if (playerPose == "s" && !under) {
     under = true;
     return false;
   }
@@ -378,15 +423,15 @@ function keyPressed() {
   if (collectState) {
     if (key == "o") {
       nn.saveData();
-    } else if( key == "s" || key == "n") {
+    } else if (key == "s" || key == "n") {
       targetLabel = key;
       console.log(targetLabel);
-      setTimeout(function() {
-        console.log('collecting');
-        state = 'collecting';
-        setTimeout(function() {
-          console.log('stopped collecting');
-          state = 'waiting';
+      setTimeout(function () {
+        console.log("collecting");
+        state = "collecting";
+        setTimeout(function () {
+          console.log("stopped collecting");
+          state = "waiting";
         }, 15000);
       }, 3000);
     }
@@ -394,10 +439,22 @@ function keyPressed() {
 }
 
 function mouseClicked() {
-  if (gameOver) {
+  // console.log(gameOver);
+  // console.log(scoreboard);
+  // console.log(submited);
+  if (gameOver && scoreboard) {
     restart();
+  } else if (gameOver && submited) {
+    api.get();
+    scoreboard = true;
   }
 }
+
+// function mouseClicked() {
+//   if (gameOver) {
+//     restart();
+//   }
+// }
 
 function modelLoaded() {
   print("model loaded");
@@ -406,10 +463,18 @@ function nnLoaded() {
   print("neural network loaded");
 }
 
-
-
 function die() {
   speed = 0;
+  if (!gameOver) {
+    input.show();
+    // input.parent("defaultCanvas0");
+    input.value(player);
+
+    button.show();
+    button.mousePressed(api.post);
+
+    label.show();
+  }
   gameOver = true;
 }
 
@@ -418,5 +483,8 @@ function restart() {
   speed = 7;
   rock.restart();
   bird.restart();
+
+  scoreboard = false;
+  submited = false;
   gameOver = false;
 }
