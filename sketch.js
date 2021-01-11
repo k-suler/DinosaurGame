@@ -141,7 +141,6 @@ function getPoses(res) {
       }
     }
   }
-
   poses = res;
 }
 
@@ -194,7 +193,7 @@ function setup() {
   nn = ml5.neuralNetwork(options);
 
   if (trainState) {
-    nn.loadData("squat.json", trainModel);
+    nn.loadData("squat2.json", trainModel);
   }
   if (!trainState && !collectState) {
     const modelInfo = {
@@ -215,7 +214,7 @@ function setup() {
   headPos = new Vec2D(width / 2, height / 2);
 }
 
-let skipingFrames = 5;
+let skipingFrames = 10;
 let skippedFrame = 0;
 
 function draw() {
@@ -247,10 +246,9 @@ function draw() {
   if (skipingFrames == skippedFrame) {
     skippedFrame = 0;
     getPoseClass();
-  } else if ((skippedFrame = 10)) {
-    drawSkeleton();
-    drawKeypoints();
   }
+  drawSkeleton();
+  drawKeypoints();
 
   // if (checkJump()) {
   // hero.jump();
