@@ -164,7 +164,7 @@ function setup() {
 
   button = createButton("submit");
   button.addClass("button");
-  button.position(w / 2 - 80, input.y + input.height + 20);
+  button.position(w / 2 - 250, input.y + input.height + 20);
   button.hide();
 
   label = createElement("h1", "Input your name:");
