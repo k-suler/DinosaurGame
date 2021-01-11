@@ -6,7 +6,7 @@ todo: add multiple head positions
 */
 
 let w = 1240;
-let h = 620;
+let h = 720;
 let gravity = 0.5;
 let limitTr = h / 2;
 let speed = 7;
@@ -44,16 +44,8 @@ let score = 0;
 let under = false;
 
 // physics for playful interaction
-let VerletPhysics2D = toxi.physics2d.VerletPhysics2D,
-  VerletParticle2D = toxi.physics2d.VerletParticle2D,
-  AttractionBehavior = toxi.physics2d.behaviors.AttractionBehavior,
-  GravityBehavior = toxi.physics2d.behaviors.GravityBehavior,
-  Vec2D = toxi.geom.Vec2D,
-  Rect = toxi.geom.Rect;
+let  Vec2D = toxi.geom.Vec2D;
 
-let NUM_PARTICLES = 10;
-
-let physics;
 let mouseAttractor;
 let mousePos;
 
@@ -97,65 +89,131 @@ function preload() {
   sounds.die = loadSound("data/sound/stop.wav");
   sounds.die.setVolume(0.4);
 
-  sounds.theme = loadSound("data/sound/Outdoor_Ambiance.mp3");
+  // sounds.theme = loadSound("data/sound/Outdoor_Ambiance.mp3");
+  sounds.theme = loadSound("data/sound/forest.mp3");
   sounds.theme.setVolume(0.2);
 }
+
+// model learning 
+let collectState = false;
+let trainState = false;
+state = 'waiting';
+let targetLabel;
+
+
+async function getPoseClass() {
+    if (poses && poses.length > 0) {
+      pose = poses[0].pose;
+      
+      let inputs = [];
+      for (let index = 0; index < pose.keypoints.length; index++) {
+        inputs.push(pose.keypoints[index].position.x);
+        inputs.push(pose.keypoints[index].position.y);
+      }
+
+      await nn.classify(inputs, controlHero)
+    }
+}
+
+
+
+function getPoses(res) {
+  // When in collecting the training data state
+  if (collectState) {
+    if (res.length > 0) {
+      pose = res[0].pose;
+      
+      if (state == 'collecting') {
+        let inputs = [];
+        for (let index = 0; index < pose.keypoints.length; index++) {
+          inputs.push(pose.keypoints[index].position.x);
+          inputs.push(pose.keypoints[index].position.y);
+        }
+        const target = [targetLabel];
+        nn.addData(inputs, target);
+      }
+    }
+  }
+
+  poses = res
+}
+
+
+function trainModel() {
+  print("training model");
+  nn.normalizeData();
+  nn.train({epochs: 10}, saveModel);
+}
+
+function saveModel() {
+  print("saving model");
+  nn.save();
+}
+
+
 
 function setup() {
   createCanvas(w, h);
   video = createCapture(VIDEO);
-  video.size(w, h);
+  video.hide();
+  // video.size(w, h);
 
   sounds.theme.loop();
   sounds.theme.play();
   loadTextures();
+
   poseNet = ml5.poseNet(video, modelLoaded);
-  poseNet.on("pose", function (results) {
-    poses = results;
-  });
+  poseNet.on("pose", getPoses);
+
+
+  let options = {
+    inputs: 34,
+    outputs: 2,
+    task: 'classification',
+    debug: true
+  }
+  nn = ml5.neuralNetwork(options)
+
+  if (trainState) {
+    nn.loadData('squat.json', trainModel);
+  }
+  if (!trainState && !collectState) {
+    const modelInfo = {
+      model: 'model.json',
+      metadata: 'model_meta.json',
+      weights: 'model.weights.bin',
+    }
+    nn.load(modelInfo, nnLoaded)
+  }
 
   hero = new Chicken();
   rock = new Rock();
   bird = new Bird();
 
-  video.hide();
   fill(255);
   stroke(255);
 
-  physics = new VerletPhysics2D();
-  // physics.setDrag(0.05);
-  // physics.setWorldBounds(new Rect(50, 0, width - 100, height - height / 3));
-  // physics.addBehavior(new GravityBehavior(new Vec2D(0, 0.15)));
-
   headPos = new Vec2D(width / 2, height / 2);
-  // headAttractor = new AttractionBehavior(headPos, 200, -2.9);
-  // physics.addBehavior(headAttractor);
-
-  // leftPos = new Vec2D(width / 2, height / 2);
-  // leftSAttractor = new AttractionBehavior(leftPos, 100, -2.9);
-  // physics.addBehavior(leftSAttractor);
-
-  // rightPos = new Vec2D(width / 2, height / 2);
-  // rightSAttractor = new AttractionBehavior(rightPos, 100, -2.9);
-  // physics.addBehavior(rightSAttractor);
-
-  // leftHPos = new Vec2D(width / 2, height / 2);
-  // leftHAttractor = new AttractionBehavior(leftHPos, 100, -2.9);
-  // physics.addBehavior(leftHAttractor);
-
-  // rightHPos = new Vec2D(width / 2, height / 2);
-  // rightHAttractor = new AttractionBehavior(rightHPos, 100, -2.9);
-  // physics.addBehavior(rightHAttractor);
+  
 }
 
+let skipingFrames = 5;
+let skippedFrame = 0;
+
 function draw() {
-  physics.update();
+
+  if (trainState || collectState) {
+
+    image(video, 0, 0, w, h);
+    drawSkeleton();
+    return;
+  }
   // background(255);
   image(backgrounds[0], 0, 0, w, h);
   hero.show();
   rock.show();
   bird.show();
-  tint(255, 30);
+  tint(255, 150);
   // heroAnim.collide(rock);
 
   // translate(w, 0); // move to far corner
@@ -164,15 +222,24 @@ function draw() {
   hero.update();
   rock.update();
   bird.update();
-  drawKeypoints();
+  // drawKeypoints();
   // drawSkeleton();
 
-  stroke(0, 100);
-  line(0, limitTr, width, limitTr);
+  // stroke(0, 100);
+  // line(0, limitTr, width, limitTr);
 
-  if (checkJump()) {
-    hero.jump();
+  skippedFrame = skippedFrame + 1;
+  if (skipingFrames == skippedFrame) {
+    skippedFrame = 0;
+    getPoseClass();
+  } else if (skippedFrame = 10) {
+    drawSkeleton();
+    drawKeypoints();
   }
+
+  // if (checkJump()) {
+    // hero.jump();
+  // }
 
   if (gameOver) {
     let c = color(255, 204, 0);
@@ -209,7 +276,7 @@ function drawSkeleton() {
     for (let j = 0; j < poses[i].skeleton.length; j++) {
       let partA = poses[i].skeleton[j][0];
       let partB = poses[i].skeleton[j][1];
-      stroke(0);
+      stroke(3);
       line(
         partA.position.x,
         partA.position.y,
@@ -227,54 +294,67 @@ function drawKeypoints() {
       if (keypoint.score > 0.2) {
         fill(255, 0, 100);
         noStroke();
-        // ellipse(keypoint.position.x, keypoint.position.y, 10, 10);
+        ellipse(keypoint.position.x, keypoint.position.y, 10, 10);
         // text(j, keypoint.position.x + 10, keypoint.position.y);
-        if (j == 0) {
-          headPos.set(keypoint.position.x, keypoint.position.y);
-          noFill();
-          stroke(100, 100, 0);
-          ellipse(keypoint.position.x, keypoint.position.y, 200, 200);
-        }
-        // if (j == 5) {
-        //   leftPos.set(keypoint.position.x, keypoint.position.y);
+        // if (j == 0) {
+        //   headPos.set(keypoint.position.x, keypoint.position.y);
         //   noFill();
         //   stroke(100, 100, 0);
-        //   ellipse(keypoint.position.x, keypoint.position.y, 100, 100);
+        //   ellipse(keypoint.position.x, keypoint.position.y, 200, 200);
         // }
-        // if (j == 6) {
-        //   rightPos.set(keypoint.position.x, keypoint.position.y);
-        //   noFill();
-        //   stroke(100, 100, 0);
-        //   ellipse(keypoint.position.x, keypoint.position.y, 100, 100);
-        // }
+        //   if (j == 5) {
+        //     leftPos.set(keypoint.position.x, keypoint.position.y);
+        //     noFill();
+        //     stroke(100, 100, 0);
+        //     ellipse(keypoint.position.x, keypoint.position.y, 100, 100);
+        //   }
+        //   if (j == 6) {
+        //     rightPos.set(keypoint.position.x, keypoint.position.y);
+        //     noFill();
+        //     stroke(100, 100, 0);
+        //     ellipse(keypoint.position.x, keypoint.position.y, 100, 100);
+        //   }
 
-        // if (j == 9) {
-        //   rightHPos.set(keypoint.position.x, keypoint.position.y);
-        //   noFill();
-        //   stroke(100, 100, 0);
-        //   ellipse(keypoint.position.x, keypoint.position.y, 100, 100);
-        // }
+        //   if (j == 9) {
+        //     rightHPos.set(keypoint.position.x, keypoint.position.y);
+        //     noFill();
+        //     stroke(100, 100, 0);
+        //     ellipse(keypoint.position.x, keypoint.position.y, 100, 100);
+        //   }
 
-        // if (j == 10) {
-        //   leftHPos.set(keypoint.position.x, keypoint.position.y);
-        //   noFill();
-        //   stroke(100, 100, 0);
-        //   ellipse(keypoint.position.x, keypoint.position.y, 100, 100);
-        // }
+        //   if (j == 10) {
+        //     leftHPos.set(keypoint.position.x, keypoint.position.y);
+        //     noFill();
+        //     stroke(100, 100, 0);
+        //     ellipse(keypoint.position.x, keypoint.position.y, 100, 100);
+        //   }
       }
     }
   }
 }
 
-function checkJump() {
-  if (headPos.y <= limitTr && under) {
+function controlHero(error, res) {
+  console.log(res[0].label)
+  const playerPose = res[0].label;
+  if (playerPose == 'n' && under) {
     under = false;
+    hero.jump();
     return true;
-  } else if (headPos.y >= limitTr && !under) {
+  } else if (playerPose == 's' && !under) {
     under = true;
     return false;
   }
 }
+
+// function checkJump() {
+//   if (headPos.y <= limitTr && under) {
+//     under = false;
+//     return true;
+//   } else if (headPos.y >= limitTr && !under) {
+//     under = true;
+//     return false;
+//   }
+// }
 
 function loadTextures() {
   // for (let i = 0; i < 10; i++) {
@@ -287,11 +367,31 @@ function loadTextures() {
   }
 }
 
-// function keyPressed() {
-//   if (key == " ") {
-//     hero.jump();
-//   }
-// }
+function keyPressed() {
+  //  if (key == " ") {
+  //    hero.jump();
+  //  }
+
+  // if in collecting state save the data
+  // s - squat
+  // n - normal state
+  if (collectState) {
+    if (key == "o") {
+      nn.saveData();
+    } else if( key == "s" || key == "n") {
+      targetLabel = key;
+      console.log(targetLabel);
+      setTimeout(function() {
+        console.log('collecting');
+        state = 'collecting';
+        setTimeout(function() {
+          console.log('stopped collecting');
+          state = 'waiting';
+        }, 15000);
+      }, 3000);
+    }
+  }
+}
 
 function mouseClicked() {
   if (gameOver) {
@@ -302,6 +402,11 @@ function mouseClicked() {
 function modelLoaded() {
   print("model loaded");
 }
+function nnLoaded() {
+  print("neural network loaded");
+}
+
+
 
 function die() {
   speed = 0;
