@@ -439,9 +439,9 @@ function keyPressed() {
 }
 
 function mouseClicked() {
-  console.log(gameOver);
-  console.log(scoreboard);
-  console.log(submited);
+  // console.log(gameOver);
+  // console.log(scoreboard);
+  // console.log(submited);
   if (gameOver && scoreboard) {
     restart();
   } else if (gameOver && submited) {
