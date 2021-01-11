@@ -49,6 +49,8 @@ let api;
 let input, button, label;
 let under = false;
 
+let scoreboard = false;
+
 // physics for playful interaction
 let Vec2D = toxi.geom.Vec2D;
 
@@ -157,6 +159,18 @@ function setup() {
   createCanvas(w, h);
 
   input = createInput();
+  input.position(20, 65);
+  input.hide();
+
+  button = createButton("submit");
+  button.position(input.x + input.width, 65);
+  button.hide();
+
+  label = createElement("h2", "what is your name?");
+  label.position(20, 5);
+  label.hide();
+
+
   video = createCapture(VIDEO);
   video.hide();
   // video.size(w, h);
@@ -244,8 +258,15 @@ function draw() {
   fill(255);
   stroke(0);
   text("FPS: " + fps.toFixed(2), 10, height - 10);
-
   if (gameOver) {
+
+    if (!scoreboard) {
+      console.log('show scoreboard')
+      input.show();
+    } {
+      input.hide();
+    }
+
     let c = color(255, 204, 0);
     fill(c);
     // noStroke();
@@ -419,17 +440,16 @@ function nnLoaded() {
 function die() {
   speed = 0;
   if (!gameOver) {
-    input = createInput();
-    input.position(20, 65);
+    input.show();
     // input.parent("defaultCanvas0");
     input.value(player);
-
-    button = createButton("submit");
-    button.position(input.x + input.width, 65);
+    
+    button.show();
     button.mousePressed(api.post);
+    
+    label.show();
 
-    label = createElement("h2", "what is your name?");
-    label.position(20, 5);
+   
   }
   gameOver = true;
 }
