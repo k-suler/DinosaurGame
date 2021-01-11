@@ -50,6 +50,7 @@ let input, button, label;
 let under = false;
 
 let scoreboard = false;
+let submited = false;
 
 // physics for playful interaction
 let Vec2D = toxi.geom.Vec2D;
@@ -159,17 +160,17 @@ function setup() {
   createCanvas(w, h);
 
   input = createInput();
-  input.position(20, 65);
+  input.position(w / 2 - 125, h / 2);
   input.hide();
 
   button = createButton("submit");
-  button.position(input.x + input.width, 65);
+  button.addClass("button");
+  button.position(w / 2 - 80, input.y + input.height + 20);
   button.hide();
 
-  label = createElement("h2", "what is your name?");
-  label.position(20, 5);
+  label = createElement("h1", "Input your name:");
+  label.position(input.x, h / 2 - 65);
   label.hide();
-
 
   video = createCapture(VIDEO);
   video.hide();
@@ -259,31 +260,52 @@ function draw() {
   stroke(0);
   text("FPS: " + fps.toFixed(2), 10, height - 10);
   if (gameOver) {
-
-    if (!scoreboard) {
-      console.log('show scoreboard')
-      input.show();
-    } {
+    if (scoreboard) {
+      console.log("show scoreboard");
       input.hide();
+      button.hide();
+      label.hide();
+
+      let c = color(255, 204, 0);
+      fill(c);
+      // noStroke();
+      strokeWeight(4);
+      stroke(50);
+      rect(w / 6, h / 6, 800, 450, 20);
+      // scale(-1.0, 1.0);
+      fill(0);
+      strokeWeight(0);
+      stroke(0);
+      textSize(40);
+      for (let index = 0; index < api.scores.length; index++) {
+        const score = api.scores[index];
+        text(
+          `${index + 1}:  ${score.score} -   ${score.player}`,
+          w / 3 + 10,
+          180 + 40 * index
+        );
+      }
+
+      noStroke();
+    } else {
+      let c = color(255, 204, 0);
+      fill(c);
+      // noStroke();
+      strokeWeight(4);
+      stroke(50);
+      rect(w / 6, h / 6, 800, 450, 20);
+      // scale(-1.0, 1.0);
+      fill(0);
+      textSize(60);
+
+      noStroke();
+      text("Game over", w / 3 + 40, h / 2 - 160);
+      textSize(40);
+      text("Score: " + score, w / 3 + 40, h / 2 - 100);
+
+      textSize(20);
+      text("Click anywhere to restart", w / 3 + 70, h / 2 + 200);
     }
-
-    let c = color(255, 204, 0);
-    fill(c);
-    // noStroke();
-    strokeWeight(4);
-    stroke(50);
-    rect(w / 6, h / 6, 800, 400, 20);
-    // scale(-1.0, 1.0);
-    fill(0);
-    textSize(60);
-
-    noStroke();
-    text("Game over", w / 3 + 40, h / 2 - 50);
-    textSize(40);
-    text("Score: " + score, w / 3 + 40, h / 2 + 50);
-
-    textSize(20);
-    text("Click anywhere to restart", w / 3 + 40, h / 2 + 150);
   }
 
   textSize(40);
@@ -419,8 +441,14 @@ function keyPressed() {
 }
 
 function mouseClicked() {
-  if (gameOver) {
+  console.log(gameOver);
+  console.log(scoreboard);
+  console.log(submited);
+  if (gameOver && scoreboard) {
     restart();
+  } else if (gameOver && submited) {
+    api.get();
+    scoreboard = true;
   }
 }
 
@@ -443,13 +471,11 @@ function die() {
     input.show();
     // input.parent("defaultCanvas0");
     input.value(player);
-    
+
     button.show();
     button.mousePressed(api.post);
-    
-    label.show();
 
-   
+    label.show();
   }
   gameOver = true;
 }
@@ -459,5 +485,8 @@ function restart() {
   speed = 7;
   rock.restart();
   bird.restart();
+
+  scoreboard = false;
+  submited = false;
   gameOver = false;
 }

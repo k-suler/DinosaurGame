@@ -22,7 +22,7 @@ class Api {
         // handle error
         console.log(error);
       });
-    this.get();
+    submited = true;
   }
 
   get() {
